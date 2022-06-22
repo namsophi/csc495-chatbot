@@ -2,7 +2,9 @@ from gtts import gTTS
 import speech_recognition as sr
 import os
 import nltk
-from nltk.stem import WordNetLemmatizer
+import geocoder
+from greeting import hello_greeting, bye_greeting
+from weather import get_current_weather
 
 nltk.download('popular', quiet=True)
 nltk.download('nps_chat', quiet=True)
@@ -12,7 +14,7 @@ nltk.download('wordnet')
 
 class ChatBot:
     def __init__(self, name):
-        print("--- starting up", name, "---")
+        print("--- starting up ---")
         self.name = name
         self.posts = nltk.corpus.nps_chat.xml_posts()[:10000]
         self.feature_sets = [(self.dialogue_act_features(post.text),
@@ -34,7 +36,7 @@ class ChatBot:
             print("me --> ", user_response)
         except sr.UnknownValueError:
             ai.text_to_speech("Oops! Didn't catch that")
-            pass
+            return True
         clas = self.classifier.classify(
             self.dialogue_act_features(user_response))
         if clas != 'Bye':
@@ -42,7 +44,7 @@ class ChatBot:
                 ai.text_to_speech("You're welcome!")
                 return False
         else:
-            ai.text_to_speech("Bye! take care.")
+            bye_greeting(ai)
             return False
 
     @staticmethod
@@ -62,7 +64,14 @@ class ChatBot:
 
 
 if __name__ == "__main__":
-    ai = ChatBot(name="maya")
+    g = geocoder.ip('me')
+    ai = ChatBot(name="Sophie")
+    new_name = hello_greeting(ai)
+    if new_name is not None:
+        ai.name = new_name
+    weather_statements = get_current_weather(lat=g.latlng[0], lon=g.latlng[1])
+    for statement in weather_statements:
+        ai.text_to_speech(statement)
     flag = True
     while flag:
         flag = ai.speech_to_text()
