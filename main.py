@@ -1,10 +1,14 @@
 from gtts import gTTS
-import speech_recognition as sr
 import os
 import nltk
 import geocoder
-from greeting import hello_greeting, bye_greeting
-from weather import get_current_weather
+from dadjokes import Dadjoke
+from scripts.cyclingEncouragement import cycling_encouragement
+from scripts.greeting import hello_greeting, bye_greeting
+from scripts.weather import get_current_weather
+from utils import listening
+from keywords import BYE_INPUT
+from states import States
 
 nltk.download('popular', quiet=True)
 nltk.download('nps_chat', quiet=True)
@@ -23,29 +27,26 @@ class ChatBot:
         self.train_set, self.test_set = self.feature_sets[self.size:], \
             self.feature_sets[:self.size]
         self.classifier = nltk.NaiveBayesClassifier.train(self.train_set)
-
-    # To Recognise input type as QUES.
+        self.state = States.NEUTRAL
+        self.dad_joke = Dadjoke()
 
     def speech_to_text(self):
-        recognizer = sr.Recognizer()
-        with sr.Microphone() as mic:
-            print("listening...")
-            audio = recognizer.listen(mic)
-        try:
-            user_response = format(recognizer.recognize_google(audio))
-            print("me --> ", user_response)
-        except sr.UnknownValueError:
-            ai.text_to_speech("Oops! Didn't catch that")
+        if self.state != 1:
+            if self.state == 2:
+                cycling_encouragement(ai)
+                return True
+        user_response = listening(ai)
+        if user_response is None:
+            self.dad_joke = Dadjoke()
+            ai.text_to_speech(self.dad_joke.joke)
             return True
-        clas = self.classifier.classify(
-            self.dialogue_act_features(user_response))
-        if clas != 'Bye':
-            if clas == 'Emotion':
-                ai.text_to_speech("You're welcome!")
+        if "thanks" in user_response or "thank you" in user_response:
+            ai.text_to_speech("You're welcome!")
+            return
+        for word in user_response.split():
+            if word.lower() in BYE_INPUT:
+                bye_greeting(ai)
                 return False
-        else:
-            bye_greeting(ai)
-            return False
 
     @staticmethod
     def text_to_speech(text):
@@ -66,12 +67,11 @@ class ChatBot:
 if __name__ == "__main__":
     g = geocoder.ip('me')
     ai = ChatBot(name="Sophie")
-    new_name = hello_greeting(ai)
-    if new_name is not None:
-        ai.name = new_name
+    hello_greeting(ai)
     weather_statements = get_current_weather(lat=g.latlng[0], lon=g.latlng[1])
     for statement in weather_statements:
         ai.text_to_speech(statement)
     flag = True
     while flag:
+        ai.state = int(input("Current state: ") or 1)
         flag = ai.speech_to_text()
